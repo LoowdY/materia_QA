@@ -1,0 +1,149 @@
+from flask import Flask, request, jsonify, render_template_string
+
+app = Flask(__name__)
+
+class ItemMenu:
+    def __init__(self, nome, descricao, preco):
+        self.nome = nome
+        self.descricao = descricao
+        self.preco = preco
+
+class Menu:
+    def __init__(self):
+        self.itens = []
+
+    def adicionar_item(self, item):
+        self.itens.append(item)
+
+    def remover_item(self, nome):
+        self.itens = [item for item in self.itens if item.nome != nome]
+
+    def listar_itens(self):
+        return self.itens
+
+class Pedido:
+    def __init__(self):
+        self.itens_pedido = []
+        self.total = 0
+
+    def adicionar_item(self, item):
+        self.itens_pedido.append(item)
+        self.total += item.preco
+
+    def listar_itens(self):
+        return self.itens_pedido
+
+class GerenciadorPedidos:
+    def __init__(self):
+        self.pedidos = []
+
+    def adicionar_pedido(self, pedido):
+        self.pedidos.append(pedido)
+
+    def listar_pedidos(self):
+        return self.pedidos
+
+class Usuario:
+    def __init__(self, nome):
+        self.nome = nome
+
+class SistemaRestaurante:
+    def __init__(self):
+        self.menu = Menu()
+        self.gerenciador_pedidos = GerenciadorPedidos()
+
+from flask import Flask, request, jsonify, render_template_string
+
+app = Flask(__name__)
+
+# Classes previamente definidas (ItemMenu, Menu, Pedido, GerenciadorPedidos, Usuario, SistemaRestaurante)
+# Insira aqui as classes ItemMenu, Menu, Pedido, GerenciadorPedidos, Usuario, SistemaRestaurante já fornecidas
+
+# Instanciando o sistema do restaurante globalmente
+sistema = SistemaRestaurante()
+
+@app.route('/adicionar-item', methods=['POST'])
+def adicionar_item():
+    dados = request.json
+    nome = dados['nome']
+    descricao = dados['descricao']
+    preco = float(dados['preco'])
+    item = ItemMenu(nome, descricao, preco)
+    sistema.menu.adicionar_item(item)
+    return jsonify({'mensagem': f"Item '{nome}' adicionado ao menu com sucesso!"})
+
+@app.route('/fazer-pedido', methods=['POST'])
+def fazer_pedido():
+    dados = request.json
+    nomes_itens = dados['itens']  # Lista de nomes dos itens pedidos
+    pedido = Pedido()
+    for nome_item in nomes_itens:
+        item = next((item for item in sistema.menu.itens if item.nome == nome_item), None)
+        if item:
+            pedido.adicionar_item(item)
+    sistema.gerenciador_pedidos.adicionar_pedido(pedido)
+    return jsonify({'mensagem': f"Pedido realizado com sucesso! Total a pagar: R${pedido.total:.2f}"})
+
+@app.route('/')
+def home():
+    return render_template_string("""
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sistema do Restaurante</title>
+    <script>
+        async function adicionarItem(e) {
+            e.preventDefault();
+            let nome = document.getElementById('nome').value;
+            let descricao = document.getElementById('descricao').value;
+            let preco = document.getElementById('preco').value;
+            const response = await fetch('/adicionar-item', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ nome, descricao, preco }),
+            });
+            const data = await response.json();
+            document.getElementById('addItemResponse').innerText = data.mensagem;
+        }
+
+        async function fazerPedido(e) {
+            e.preventDefault();
+            let itens = document.getElementById('itensPedido').value.split(',').map(item => item.trim());
+            const response = await fetch('/fazer-pedido', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ itens }),
+            });
+            const data = await response.json();
+            document.getElementById('pedidoResponse').innerText = data.mensagem;
+        }
+    </script>
+</head>
+<body>
+    <h1>Bem-vindo ao Sistema de Gerenciamento do Restaurante</h1>
+    
+    <h2>Adicionar Item ao Menu</h2>
+    <form onsubmit="adicionarItem(event)">
+        <input type="text" id="nome" name="nome" placeholder="Nome do Item" required>
+        <input type="text" id="descricao" name="descricao" placeholder="Descrição" required>
+        <input type="number" id="preco" name="preco" placeholder="Preço" step="0.01" required>
+        <input type="submit" value="Adicionar Item">
+    </form>
+    <p id="addItemResponse"></p>
+    
+    <h2>Fazer Pedido</h2>
+    <form onsubmit="fazerPedido(event)">
+        <input type="text" id="itensPedido" name="itensPedido" placeholder="Itens do Pedido (separados por vírgula)" required>
+        <input type="submit" value="Fazer Pedido">
+    </form>
+    <p id="pedidoResponse"></p>
+</body>
+</html>
+""")
+
+if __name__ == '__main__':
+    app.run(debug=True)
